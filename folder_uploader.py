@@ -446,16 +446,18 @@ def create_resource(user_id, original_image, image_128, image_518, session):
         session.close()
     return
 
-def process_images(image_path, sizes=(128, 512)):
-    def resize_image(original_image, size):
-        resized_image = original_image.resize((size, size))
+def process_images(image_path, heights=(128, 512)):
+    def resize_image(original_image, height):
+        aspect_ratio = original_image.width / original_image.height
+        new_width = int(height * aspect_ratio)
+        resized_image = original_image.resize((new_width, height))
         image_bytes = io.BytesIO()
         resized_image.save(image_bytes, format='PNG')
         image_bytes.seek(0)
         return Image.open(image_bytes)
 
     original_image = Image.open(image_path)
-    resized_images = {size: resize_image(original_image, size) for size in sizes}
+    resized_images = {height: resize_image(original_image, height) for height in heights}
     return original_image, resized_images[128], resized_images[512]
 
 def mapping_folder_resource(session, resource_id, folder_json_id, team_id):
