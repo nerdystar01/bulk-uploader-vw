@@ -2,3 +2,4 @@ wcidfu-77f802b00777.json
 *.json
 wcidfu-ssh
 __pycache__/
+.DS_Store
