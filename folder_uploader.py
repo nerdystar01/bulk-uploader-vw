@@ -208,6 +208,7 @@ class Resource(Base):
     thumbnail_image = Column(String(200), default="")
     thumbnail_image_512 = Column(String(300), default="")
     is_variation = Column(Boolean, default=False)
+    star_rating = Column(Integer, default=0)
     generate_opt = Column(String(200), default="Upload")
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
