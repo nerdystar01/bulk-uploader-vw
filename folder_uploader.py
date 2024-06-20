@@ -470,40 +470,7 @@ def mapping_folder_resource(session, resource_id, folder_json_id, team_id):
         )
     session.add(new_mapping)
     session.commit()
-    
-# def process_and_upload(png, upload_folder, user_id, folder_json_id, team_id, session):
-#     png_path = os.path.join(upload_folder, png)
-#     original_image, image_128, image_518 = process_images(png_path)  # 이미지 크기 조정 및 저장
-#     resource_id = create_resource(user_id, original_image, image_128, image_518, session)
-#     mapping_folder_resource(session, resource_id, folder_json_id, team_id)
 
-# def main(upload_folder, user_id, folder_json_id, team_id):
-#     png_files = [f for f in os.listdir(upload_folder) if f.endswith('.png')]
-#     print_timestamp('[main.py 작동 시작]')
-#     session, server = get_session()
-#     try:
-#         with ThreadPoolExecutor() as executor:
-#             futures = {executor.submit(process_and_upload, png, upload_folder, user_id, folder_json_id, team_id, session): png for png in png_files}
-            
-#             for future in tqdm(as_completed(futures), total=len(futures), desc="Processing images"):
-#                 png = futures[future]
-#                 try:
-#                     future.result()
-#                 except Exception as e:
-#                     print(f"Error processing {png}: {e}")
-    
-#     finally:
-#         end_session(session)
-#         print_timestamp('[main.py 작동 종료]')
-
-# if __name__ == "__main__":
-#     # 명령줄 인수 파싱
-#     if len(sys.argv) != 5:
-#         print("사용법: folder_uploader.py <upload_folder> <user_id> <folder_json_id> <team_id>")
-#         sys.exit(1)
-    
-#     upload_folder, user_id, folder_json_id, team_id = sys.argv[1:]
-#     main(upload_folder, user_id, folder_json_id, team_id)
 def process_and_upload(png, upload_folder, user_id, folder_json_id, team_id, session):
     png_path = os.path.join(upload_folder, png)
     original_image, image_128, image_518 = process_images(png_path)  # 이미지 크기 조정 및 저장
@@ -517,7 +484,7 @@ def process_folder(upload_folder, user_id, team_id, session):
         if not png_files:
             continue
         
-        with ThreadPoolExecutor() as executor:
+        with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(process_and_upload, png, root, user_id, folder_json_id, team_id, session): png for png in png_files}
             
             for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {folder_json_id}"):
