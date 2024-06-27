@@ -512,6 +512,7 @@ def process_folder_with_structure(folder_structure, root_path, user_id, team_id,
         
         png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
         if not png_files:
+            folder_info["name"] = os.path.basename(folder_path)
             continue
 
         with ThreadPoolExecutor(max_workers=5) as executor:
