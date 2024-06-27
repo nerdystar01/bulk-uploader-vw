@@ -250,7 +250,6 @@ class Team(Base):
 
     id = Column(Integer, primary_key=True)
     create_user_id = Column(String(255), nullable=False)
-    resource_id = Column(Integer, ForeignKey('resource.id'), nullable=True)
     nano_id = Column(String(21), nullable=False)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
