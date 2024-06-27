@@ -245,6 +245,16 @@ class FolderResourceMap(Base):
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
+class Team(Base):
+    __tablename__ = 'team'
+
+    id = Column(Integer, primary_key=True)
+    create_user_id = Column(String(255), nullable=False)
+    resource_id = Column(Integer, ForeignKey('resource.id'), nullable=True)
+    nano_id = Column(String(21), nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
 def start_ssh_tunnel():
     server = SSHTunnelForwarder(
         ('34.64.105.81', 22),
@@ -567,8 +577,10 @@ import uuid
 import requests
 from google.cloud import storage
 
-def update_public_json_file(session, team_id, uploaded_folder_structure):
+def update_public_json_file(session, team_nano_id, uploaded_folder_structure):
     # PublicFolder 가져오기
+
+    team_id = session.query(Team).filter(Team.nano_id == team_nano_id).first().id
     public_folder = session.query(PublicFolder).filter(PublicFolder.team_id == team_id).first()
     
     if not public_folder or not public_folder.json_file:
@@ -619,13 +631,13 @@ def update_public_json_file(session, team_id, uploaded_folder_structure):
     # 모든 작업이 성공하면 백업 파일 삭제
     backup_blob.delete()
     
-def main(upload_folder, user_id, team_id):
+def main(upload_folder, user_id, team_nano_id):
     print_timestamp('[main.py 작동 시작]')
     session, server = get_session()
     try:
         folder_structure = generate_folder_structure(upload_folder)
-        uploaded_folder_structure = process_folder_with_structure(folder_structure, upload_folder, user_id, team_id, session)
-        update_public_json_file(session, team_id, uploaded_folder_structure)
+        uploaded_folder_structure = process_folder_with_structure(folder_structure, upload_folder, user_id, team_nano_id, session)
+        update_public_json_file(session, team_nano_id, uploaded_folder_structure)
     finally:
         end_session(session)
         print_timestamp('[main.py 작동 종료]')
@@ -633,11 +645,11 @@ def main(upload_folder, user_id, team_id):
 if __name__ == "__main__":
     # 명령줄 인수 파싱
     if len(sys.argv) != 4:
-        print("사용법: folder_uploader.py <upload_folder> <user_id> <team_id>")
+        print("사용법: folder_uploader.py <upload_folder> <user_id> <team_nano_id>")
         sys.exit(1)
     
-    upload_folder, user_id, team_id = sys.argv[1:]
-    main(upload_folder, user_id, team_id)
+    upload_folder, user_id, team_nano_id = sys.argv[1:]
+    main(upload_folder, user_id, team_nano_id)
 
 # AXjJkzww4t1uSfuxr2-Mr
 # '/Users/nerdystar/Desktop/Sejuani'
