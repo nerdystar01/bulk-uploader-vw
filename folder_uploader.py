@@ -625,7 +625,7 @@ def main(upload_folder, user_id, team_id):
     try:
         folder_structure = generate_folder_structure(upload_folder)
         uploaded_folder_structure = process_folder_with_structure(folder_structure, upload_folder, user_id, team_id, session)
-        update_public_json_file(uploaded_folder_structure)
+        update_public_json_file(session, team_id, uploaded_folder_structure)
     finally:
         end_session(session)
         print_timestamp('[main.py 작동 종료]')
