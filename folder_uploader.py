@@ -210,6 +210,8 @@ class Resource(Base):
     thumbnail_image_512 = Column(String(300), default="")
     is_variation = Column(Boolean, default=False)
     star_rating = Column(Integer, default=0)
+    clip_skip = Column(Integer, default=0)
+    tags = Column(String(200), default="Upload")
     generate_opt = Column(String(200), default="Upload")
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
@@ -432,6 +434,12 @@ def create_resource(user_id, original_image, image_128, image_518, session):
 
             if "VAE" in params:
                 new_resource.sd_vae = params["VAE"]
+                session.commit()
+            else:
+                pass
+
+            if "Clip skip" in params:
+                new_resource.clip_skip = params["Clip skip"]
                 session.commit()
             else:
                 pass
