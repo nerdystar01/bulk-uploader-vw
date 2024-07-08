@@ -415,8 +415,8 @@ def create_resource(user_id, original_image, image_128, image_518, session):
 
             if "Size" in params:
                 size_list = [int(n) for n in params["Size"].split('x')]
-                new_resource.height = size_list[0]
-                new_resource.width = size_list[1]
+                new_resource.width = size_list[0]
+                new_resource.height = size_list[1]
                 session.commit()
             else:
                 pass
