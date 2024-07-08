@@ -396,7 +396,20 @@ def create_resource(user_id, original_image, image_128, image_518, session):
                 pass
 
             if "Sampler" in params:
-                new_resource.sampler = params["Sampler"]
+                schedule_label_list = ["Uniform", "Karras", "Exponential", "Polyexponential"]
+                sampler = params["Sampler"].strip()
+                scheduler_found = False
+                
+                for label in schedule_label_list:
+                    if label.lower() in sampler.lower():
+                        new_resource.sampler = sampler.replace(label, "").strip()
+                        new_resource.sampler_scheduler = label
+                        scheduler_found = True
+                        break
+                
+                if not scheduler_found:
+                    new_resource.sampler = sampler
+                    new_resource.sampler_scheduler = None
                 session.commit()
             else:
                 pass
