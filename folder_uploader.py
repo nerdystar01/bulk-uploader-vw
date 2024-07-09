@@ -219,7 +219,7 @@ class Resource(Base):
     is_variation = Column(Boolean, default=False)
     star_rating = Column(Integer, default=0)
     clip_skip = Column(Integer, default=0)
-    tags = Column(String(200), default="Upload")
+    tags = Column(String(200), default="")
     generate_opt = Column(String(200), default="Upload")
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
