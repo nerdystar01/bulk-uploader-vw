@@ -164,6 +164,14 @@ Steps: {json_info["steps"]}, CFG scale: {json_info["scale"]}, Seed: {json_info["
         except Exception as e:
             print("Error:", str(e))
 
+class User(Base):
+    __tablename__ = 'user'
+    id = Column(Integer, primary_key=True)
+    email = Column(String, unique=True, nullable=False)
+    folder_id = Column(Integer, ForeignKey('folder.id'), nullable=True)
+    json_file = Column(String, nullable=True)  # SQLAlchemy does not support a direct FileField equivalent
+    nano_id = Column(String(21), unique=True, nullable=True)
+
 class Resource(Base):
     __tablename__ = 'resource'
     id = Column(Integer, primary_key=True)
@@ -525,7 +533,7 @@ def process_folder(upload_folder, user_id, team_id, session):
                 except Exception as e:
                     print(f"Error processing {png} in folder {folder_json_id}: {e}")
 
-def process_folder_with_structure(folder_structure, root_path, user_id, team_id, session):
+def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
     for folder_id, folder_info in folder_structure.items():
         folder_path = os.path.join(root_path, folder_info["name"])
         if not os.path.exists(folder_path):
@@ -537,7 +545,7 @@ def process_folder_with_structure(folder_structure, root_path, user_id, team_id,
             continue
 
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, team_id, session): png for png in png_files}
+            futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
 
             for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {folder_info['name']}"):
                 png = futures[future]
@@ -598,17 +606,23 @@ import uuid
 import requests
 from google.cloud import storage
 
-def update_public_json_file(session, team_nano_id, uploaded_folder_structure):
-    # PublicFolder 가져오기
+def update_public_json_file(session, nano_id, uploaded_folder_structure):
+    user = session.query(User).filter(User.nano_id == nano_id).first()
+    team = session.query(Team).filter(Team.nano_id == nano_id).first()
+    
+    if user:
+        file_path = user.json_file
 
-    team_id = session.query(Team).filter(Team.nano_id == team_nano_id).first().id
-    public_folder = session.query(PublicFolder).filter(PublicFolder.team_id == team_id).first()
+        if not user.json_file:
+            raise KeyError("User Private folder not found or no json file associated.")
+    elif team:
+        team_id = team.id
+        public_folder = session.query(PublicFolder).filter(PublicFolder.team_id == team_id).first()
     
-    if not public_folder or not public_folder.json_file:
-        raise KeyError("Public folder not found or no json file associated.")
+        if not public_folder or not public_folder.json_file:
+            raise KeyError("Public folder not found or no json file associated.")
+        file_path = public_folder.json_file
     
-    # 기존 JSON 파일 경로와 URL 설정
-    file_path = public_folder.json_file
     google_url = f"https://storage.googleapis.com/wcidfu-bucket/_media/{file_path}"
 
     # 기존 JSON 파일 가져오기
@@ -652,13 +666,13 @@ def update_public_json_file(session, team_nano_id, uploaded_folder_structure):
     # 모든 작업이 성공하면 백업 파일 삭제
     backup_blob.delete()
     
-def main(upload_folder, user_id, team_nano_id):
+def main(upload_folder, user_id, nano_id):
     print_timestamp('[main.py 작동 시작]')
     session, server = get_session()
     try:
         folder_structure = generate_folder_structure(upload_folder)
-        uploaded_folder_structure = process_folder_with_structure(folder_structure, upload_folder, user_id, team_nano_id, session)
-        update_public_json_file(session, team_nano_id, uploaded_folder_structure)
+        uploaded_folder_structure = process_folder_with_structure(folder_structure, upload_folder, user_id, nano_id, session)
+        update_public_json_file(session, nano_id, uploaded_folder_structure)
     finally:
         end_session(session)
         print_timestamp('[main.py 작동 종료]')
@@ -666,11 +680,11 @@ def main(upload_folder, user_id, team_nano_id):
 if __name__ == "__main__":
     # 명령줄 인수 파싱
     if len(sys.argv) != 4:
-        print("사용법: folder_uploader.py <upload_folder> <user_id> <team_nano_id>")
+        print("사용법: folder_uploader.py <upload_folder> <user_id> <nano_id>")
         sys.exit(1)
     
-    upload_folder, user_id, team_nano_id = sys.argv[1:]
-    main(upload_folder, user_id, team_nano_id)
+    upload_folder, user_id, nano_id = sys.argv[1:]
+    main(upload_folder, user_id, nano_id)
 
 # AXjJkzww4t1uSfuxr2-Mr
 # '/Users/nerdystar/Desktop/Sejuani'
