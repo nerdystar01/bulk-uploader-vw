@@ -168,7 +168,7 @@ class User(Base):
     __tablename__ = 'user'
     id = Column(Integer, primary_key=True)
     email = Column(String, unique=True, nullable=False)
-    folder_id = Column(Integer, ForeignKey('folder.id'), nullable=True)
+    folder_id = Column(Integer, nullable=True)
     json_file = Column(String, nullable=True)  # SQLAlchemy does not support a direct FileField equivalent
     nano_id = Column(String(21), unique=True, nullable=True)
 
