@@ -606,15 +606,74 @@ import uuid
 import requests
 from google.cloud import storage
 
+# def update_public_json_file(session, nano_id, uploaded_folder_structure):
+#     user = session.query(User).filter(User.nano_id == nano_id).first()
+#     team = session.query(Team).filter(Team.nano_id == nano_id).first()
+    
+#     if user:
+#         file_path = user.json_file
+
+#         if not user.json_file:
+#             raise KeyError("User Private folder not found or no json file associated.")
+#     elif team:
+#         team_id = team.id
+#         public_folder = session.query(PublicFolder).filter(PublicFolder.team_id == team_id).first()
+    
+#         if not public_folder or not public_folder.json_file:
+#             raise KeyError("Public folder not found or no json file associated.")
+#         file_path = public_folder.json_file
+    
+#     google_url = f"https://storage.googleapis.com/wcidfu-bucket/_media/{file_path}"
+
+#     # 기존 JSON 파일 가져오기
+#     response = requests.get(google_url)
+#     response.raise_for_status()  # 요청 실패 시 예외 발생
+
+#     # JSON 파일 내용 디코딩 및 로드
+#     public_folder_tree_file = response.content
+#     tree_file = json.loads(public_folder_tree_file.decode('utf-8'))
+
+#     # 현재 트리 구조에 새로운 폴더 구조 업데이트
+#     current_tree = tree_file.get('json', {})
+#     current_tree.update(uploaded_folder_structure)
+
+#     # Google Cloud Storage 클라이언트 생성
+#     storage_client = storage.Client()
+    
+#     bucket_name = "wcidfu-bucket"
+#     bucket = storage_client.bucket(bucket_name)
+#     blob = bucket.blob(f"_media/{file_path}")
+
+#     # 기존 파일 백업
+#     backup_blob = bucket.blob(f"_media/backup/{file_path}")
+#     bucket.copy_blob(blob, bucket, new_name=backup_blob.name) 
+
+#     # 기존 파일 삭제
+#     blob.delete()
+
+#     # 새로운 JSON 파일 경로 설정 및 업로드
+#     new_file_name = f"public_json_file/{uuid.uuid4()}.json"
+#     new_blob = bucket.blob(f"_media/{new_file_name}")
+    
+#     # 최종적으로 업데이트된 JSON 데이터를 생성하여 업로드
+#     updated_json_string = json.dumps(tree_file, ensure_ascii=False, indent=2)
+#     new_blob.upload_from_string(updated_json_string, content_type='application/json')
+
+#     # 데이터베이스 업데이트 및 세션 커밋
+#     public_folder.json_file = new_file_name
+#     session.commit()
+
+#     # 모든 작업이 성공하면 백업 파일 삭제
+#     backup_blob.delete()
 def update_public_json_file(session, nano_id, uploaded_folder_structure):
     user = session.query(User).filter(User.nano_id == nano_id).first()
     team = session.query(Team).filter(Team.nano_id == nano_id).first()
     
     if user:
         file_path = user.json_file
-
         if not user.json_file:
             raise KeyError("User Private folder not found or no json file associated.")
+        entity = user
     elif team:
         team_id = team.id
         public_folder = session.query(PublicFolder).filter(PublicFolder.team_id == team_id).first()
@@ -622,6 +681,9 @@ def update_public_json_file(session, nano_id, uploaded_folder_structure):
         if not public_folder or not public_folder.json_file:
             raise KeyError("Public folder not found or no json file associated.")
         file_path = public_folder.json_file
+        entity = public_folder
+    else:
+        raise KeyError("Neither user nor team found with the given nano_id.")
     
     google_url = f"https://storage.googleapis.com/wcidfu-bucket/_media/{file_path}"
 
@@ -630,8 +692,8 @@ def update_public_json_file(session, nano_id, uploaded_folder_structure):
     response.raise_for_status()  # 요청 실패 시 예외 발생
 
     # JSON 파일 내용 디코딩 및 로드
-    public_folder_tree_file = response.content
-    tree_file = json.loads(public_folder_tree_file.decode('utf-8'))
+    folder_tree_file = response.content
+    tree_file = json.loads(folder_tree_file.decode('utf-8'))
 
     # 현재 트리 구조에 새로운 폴더 구조 업데이트
     current_tree = tree_file.get('json', {})
@@ -660,7 +722,7 @@ def update_public_json_file(session, nano_id, uploaded_folder_structure):
     new_blob.upload_from_string(updated_json_string, content_type='application/json')
 
     # 데이터베이스 업데이트 및 세션 커밋
-    public_folder.json_file = new_file_name
+    entity.json_file = new_file_name
     session.commit()
 
     # 모든 작업이 성공하면 백업 파일 삭제
