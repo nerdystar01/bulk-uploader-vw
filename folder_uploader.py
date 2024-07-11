@@ -559,9 +559,23 @@ def process_folder(upload_folder, user_id, team_id, session):
 
 #     return folder_structure
                     
+def update_folder_structure(folder_structure, folder_id, uploaded_count, total_files):
+    folder_info = folder_structure[folder_id]
+    original_name = re.sub(r'\[.*?\]\s*', '', folder_info["name"]).strip()
+    
+    if uploaded_count == total_files:
+        folder_info["name"] = original_name
+    elif uploaded_count == 0:
+        folder_info["name"] = f"[ 업로드 실패 ] {original_name}"
+    else:
+        progress = f"{uploaded_count}/{total_files}"
+        folder_info["name"] = f"[ 업로드 중 {progress} ] {original_name}"
+
 def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
     for folder_id, folder_info in folder_structure.items():
-        folder_path = os.path.join(root_path, folder_info["name"].replace("[ 업로드 실패 ] ", ""))
+        original_name = re.sub(r'\[.*?\]\s*', '', folder_info["name"]).strip()
+        folder_path = os.path.join(root_path, original_name)
+        
         if not os.path.exists(folder_path):
             continue
         
@@ -572,30 +586,27 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
         uploaded_count = 0
         total_files = len(png_files)
 
+        update_folder_structure(folder_structure, folder_id, uploaded_count, total_files)
+
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
 
-            for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {folder_info['name']}"):
+            for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {original_name}"):
                 png = futures[future]
                 try:
                     future.result()
                     uploaded_count += 1
                     update_folder_structure(folder_structure, folder_id, uploaded_count, total_files)
-                    update_public_json_file(session, nano_id, folder_structure)
                 except Exception as e:
-                    print(f"Error processing {png} in folder {folder_info['name']}: {e}")
+                    print(f"Error processing {png} in folder {original_name}: {e}")
+
+        # 폴더 처리가 완료된 후 최종 업데이트
+        update_folder_structure(folder_structure, folder_id, uploaded_count, total_files)
+
+    # 모든 폴더 처리가 완료된 후 한 번만 JSON 파일 업데이트
+    update_public_json_file(session, nano_id, folder_structure)
 
     return folder_structure
-
-def update_folder_structure(folder_structure, folder_id, uploaded_count, total_files):
-    folder_info = folder_structure[folder_id]
-    original_name = folder_info["name"].replace("[ 업로드 실패 ] ", "")
-    
-    if uploaded_count == total_files:
-        folder_info["name"] = original_name
-    else:
-        progress = f"{uploaded_count}/{total_files}"
-        folder_info["name"] = f"[ 업로드 중 {progress} ] {original_name}"
 
 def generate_folder_id():
     return generate(size=21)
