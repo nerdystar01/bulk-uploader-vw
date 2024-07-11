@@ -685,6 +685,7 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
         print(uploade_folder_structure)
         print("퍼블릭 폴더 업데이트 시작.")
         update_public_json_file(session, nano_id, uploade_folder_structure)
+        print("퍼블릭 폴더 업데이트 종료.")
         
     return folder_structure
     
