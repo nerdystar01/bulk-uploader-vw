@@ -532,82 +532,7 @@ def process_folder(upload_folder, user_id, team_id, session):
                     future.result()
                 except Exception as e:
                     print(f"Error processing {png} in folder {folder_json_id}: {e}")
-
-# def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
-#     for folder_id, folder_info in folder_structure.items():
-#         folder_path = os.path.join(root_path, folder_info["name"])
-#         if not os.path.exists(folder_path):
-#             continue
-        
-#         png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
-#         if not png_files:
-#             # folder_info["name"] = os.path.basename(folder_path)
-#             continue
-
-#         with ThreadPoolExecutor(max_workers=5) as executor:
-#             futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
-
-#             for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {folder_info['name']}"):
-#                 png = futures[future]
-#                 try:
-#                     future.result()
-#                 except Exception as e:
-#                     print(f"Error processing {png} in folder {folder_info['name']}: {e}")
-
-#         # 폴더의 업로드가 완료되면 name을 실질적인 폴더 이름으로 수정
-#         # folder_info["name"] = os.path.basename(folder_path)
-
-#     return folder_structure
-                    
-def update_folder_structure(folder_structure, folder_id, uploaded_count, total_files):
-    folder_info = folder_structure[folder_id]
-    original_name = re.sub(r'\[.*?\]\s*', '', folder_info["name"]).strip()
-    
-    if uploaded_count == total_files:
-        folder_info["name"] = original_name
-    elif uploaded_count == 0:
-        folder_info["name"] = f"[ 업로드 실패 ] {original_name}"
-    else:
-        progress = f"{uploaded_count}/{total_files}"
-        folder_info["name"] = f"[ 업로드 중 {progress} ] {original_name}"
-
-def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
-    for folder_id, folder_info in folder_structure.items():
-        original_name = re.sub(r'\[.*?\]\s*', '', folder_info["name"]).strip()
-        folder_path = os.path.join(root_path, original_name)
-        
-        if not os.path.exists(folder_path):
-            continue
-        
-        png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
-        if not png_files:
-            continue
-
-        uploaded_count = 0
-        total_files = len(png_files)
-
-        update_folder_structure(folder_structure, folder_id, uploaded_count, total_files)
-
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
-
-            for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {original_name}"):
-                png = futures[future]
-                try:
-                    future.result()
-                    uploaded_count += 1
-                    update_folder_structure(folder_structure, folder_id, uploaded_count, total_files)
-                except Exception as e:
-                    print(f"Error processing {png} in folder {original_name}: {e}")
-
-        # 폴더 처리가 완료된 후 최종 업데이트
-        update_folder_structure(folder_structure, folder_id, uploaded_count, total_files)
-
-    # 모든 폴더 처리가 완료된 후 한 번만 JSON 파일 업데이트
-    update_public_json_file(session, nano_id, folder_structure)
-
-    return folder_structure
-
+             
 def generate_folder_id():
     return generate(size=21)
 
@@ -615,13 +540,11 @@ def create_folder_tree(path, parent_id=None, parent_id_list=[]):
     # folder_name = os.path.abspath(path)  # 절대 경로를 폴더 이름으로 설정
     folder_name = os.path.basename(path)
     folder_id = generate_folder_id()
-    
-    modified_folder_name = f"[ 업로드 실패 ] {folder_name}"
 
     # 현재 폴더 정보를 설정
     folder_info = {
         "id": folder_id,
-        "name": modified_folder_name,
+        "name": folder_name,
         "children": [],
         "parentId": parent_id,
         "parentIdList": parent_id_list
@@ -646,32 +569,6 @@ def create_folder_tree(path, parent_id=None, parent_id_list=[]):
         "folder_info": folder_info,
         "folder_dict": folder_dict
     }
-
-def generate_folder_structure(root_path):
-    result = create_folder_tree(root_path)
-    folder_dict = result["folder_dict"]
-    
-    # 현재 날짜와 시간으로 파일 이름 생성
-    now = datetime.now()
-    file_name = now.strftime("%Y%m%d_%H%M%S") + "_folder_structure.json"
-    
-    # folder_tree 디렉토리 생성 (없는 경우)
-    folder_tree_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folder_tree")
-    os.makedirs(folder_tree_path, exist_ok=True)
-    
-    # JSON 파일로 저장
-    file_path = os.path.join(folder_tree_path, file_name)
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(folder_dict, f, ensure_ascii=False, indent=2)
-    
-    print(f"폴더 구조가 {file_path}에 저장되었습니다.")
-    
-    return folder_dict
-
-import json
-import uuid
-import requests
-from google.cloud import storage
 
 def update_public_json_file(session, nano_id, uploaded_folder_structure):
     user = session.query(User).filter(User.nano_id == nano_id).first()
@@ -736,6 +633,58 @@ def update_public_json_file(session, nano_id, uploaded_folder_structure):
 
     # 모든 작업이 성공하면 백업 파일 삭제
     backup_blob.delete()
+
+def generate_folder_structure(root_path):
+    result = create_folder_tree(root_path)
+    folder_dict = result["folder_dict"]
+    
+    # 현재 날짜와 시간으로 파일 이름 생성
+    now = datetime.now()
+    file_name = now.strftime("%Y%m%d_%H%M%S") + "_folder_structure.json"
+    
+    # folder_tree 디렉토리 생성 (없는 경우)
+    folder_tree_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folder_tree")
+    os.makedirs(folder_tree_path, exist_ok=True)
+    
+    # JSON 파일로 저장
+    file_path = os.path.join(folder_tree_path, file_name)
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(folder_dict, f, ensure_ascii=False, indent=2)
+    
+    print(f"폴더 구조가 {file_path}에 저장되었습니다.")
+    
+    return folder_dict
+
+import json
+import uuid
+import requests
+from google.cloud import storage
+
+def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
+    for folder_id, folder_info in folder_structure.items():
+        uploade_folder_structure = {}
+        folder_path = os.path.join(root_path, folder_info["name"])
+        if not os.path.exists(folder_path):
+            continue
+        
+        png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
+        if not png_files:
+            continue
+
+        with ThreadPoolExecutor(max_workers=7) as executor:
+            futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
+
+            for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {folder_info['name']}"):
+                png = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"Error processing {png} in folder {folder_info['name']}: {e}")
+
+        uploade_folder_structure[folder_id] = folder_info
+        update_public_json_file(session, nano_id, uploade_folder_structure)
+        
+    return folder_structure
     
 def main(upload_folder, user_id, nano_id):
     print_timestamp('[main.py 작동 시작]')
@@ -743,7 +692,6 @@ def main(upload_folder, user_id, nano_id):
     try:
         folder_structure = generate_folder_structure(upload_folder)
         uploaded_folder_structure = process_folder_with_structure(folder_structure, upload_folder, user_id, nano_id, session)
-        update_public_json_file(session, nano_id, uploaded_folder_structure)
     finally:
         end_session(session)
         print_timestamp('[main.py 작동 종료]')
