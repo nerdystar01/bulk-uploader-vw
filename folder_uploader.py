@@ -571,6 +571,7 @@ def create_folder_tree(path, parent_id=None, parent_id_list=[]):
     }
 
 def update_public_json_file(session, nano_id, uploaded_folder_structure):
+    print("잔압")
     user = session.query(User).filter(User.nano_id == nano_id).first()
     team = session.query(Team).filter(Team.nano_id == nano_id).first()
     
@@ -633,6 +634,7 @@ def update_public_json_file(session, nano_id, uploaded_folder_structure):
 
     # 모든 작업이 성공하면 백업 파일 삭제
     backup_blob.delete()
+    print("탈출")
 
 def generate_folder_structure(root_path):
     result = create_folder_tree(root_path)
