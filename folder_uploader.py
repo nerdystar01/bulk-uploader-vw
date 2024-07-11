@@ -684,7 +684,7 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
         uploade_folder_structure[folder_id] = folder_info
         print(uploade_folder_structure)
         print("퍼블릭 폴더 업데이트 시작.")
-        update_public_json_file(session, nano_id, uploade_folder_structure)
+        # update_public_json_file(session, nano_id, uploade_folder_structure)
         
     return folder_structure
     
@@ -694,6 +694,7 @@ def main(upload_folder, user_id, nano_id):
     try:
         folder_structure = generate_folder_structure(upload_folder)
         uploaded_folder_structure = process_folder_with_structure(folder_structure, upload_folder, user_id, nano_id, session)
+        update_public_json_file(session, nano_id, uploaded_folder_structure)
     finally:
         end_session(session)
         print_timestamp('[main.py 작동 종료]')
