@@ -682,6 +682,8 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
                     print(f"Error processing {png} in folder {folder_info['name']}: {e}")
 
         uploade_folder_structure[folder_id] = folder_info
+        print(uploade_folder_structure)
+        print("퍼블릭 폴더 업데이트 시작.")
         update_public_json_file(session, nano_id, uploade_folder_structure)
         
     return folder_structure
