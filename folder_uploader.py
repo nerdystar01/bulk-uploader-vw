@@ -533,16 +533,44 @@ def process_folder(upload_folder, user_id, team_id, session):
                 except Exception as e:
                     print(f"Error processing {png} in folder {folder_json_id}: {e}")
 
+# def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
+#     for folder_id, folder_info in folder_structure.items():
+#         folder_path = os.path.join(root_path, folder_info["name"])
+#         if not os.path.exists(folder_path):
+#             continue
+        
+#         png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
+#         if not png_files:
+#             # folder_info["name"] = os.path.basename(folder_path)
+#             continue
+
+#         with ThreadPoolExecutor(max_workers=5) as executor:
+#             futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
+
+#             for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {folder_info['name']}"):
+#                 png = futures[future]
+#                 try:
+#                     future.result()
+#                 except Exception as e:
+#                     print(f"Error processing {png} in folder {folder_info['name']}: {e}")
+
+#         # 폴더의 업로드가 완료되면 name을 실질적인 폴더 이름으로 수정
+#         # folder_info["name"] = os.path.basename(folder_path)
+
+#     return folder_structure
+                    
 def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
     for folder_id, folder_info in folder_structure.items():
-        folder_path = os.path.join(root_path, folder_info["name"])
+        folder_path = os.path.join(root_path, folder_info["name"].replace("[ 업로드 실패 ] ", ""))
         if not os.path.exists(folder_path):
             continue
         
         png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
         if not png_files:
-            folder_info["name"] = os.path.basename(folder_path)
             continue
+
+        uploaded_count = 0
+        total_files = len(png_files)
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
@@ -551,26 +579,38 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
                 png = futures[future]
                 try:
                     future.result()
+                    uploaded_count += 1
+                    update_folder_structure(folder_structure, folder_id, uploaded_count, total_files)
+                    update_public_json_file(session, nano_id, folder_structure)
                 except Exception as e:
                     print(f"Error processing {png} in folder {folder_info['name']}: {e}")
 
-        # 폴더의 업로드가 완료되면 name을 실질적인 폴더 이름으로 수정
-        folder_info["name"] = os.path.basename(folder_path)
-
     return folder_structure
 
+def update_folder_structure(folder_structure, folder_id, uploaded_count, total_files):
+    folder_info = folder_structure[folder_id]
+    original_name = folder_info["name"].replace("[ 업로드 실패 ] ", "")
+    
+    if uploaded_count == total_files:
+        folder_info["name"] = original_name
+    else:
+        progress = f"{uploaded_count}/{total_files}"
+        folder_info["name"] = f"[ 업로드 중 {progress} ] {original_name}"
 
 def generate_folder_id():
     return generate(size=21)
 
 def create_folder_tree(path, parent_id=None, parent_id_list=[]):
-    folder_name = os.path.abspath(path)  # 절대 경로를 폴더 이름으로 설정
+    # folder_name = os.path.abspath(path)  # 절대 경로를 폴더 이름으로 설정
+    folder_name = os.path.basename(path)
     folder_id = generate_folder_id()
     
+    modified_folder_name = f"[ 업로드 실패 ] {folder_name}"
+
     # 현재 폴더 정보를 설정
     folder_info = {
         "id": folder_id,
-        "name": folder_name,
+        "name": modified_folder_name,
         "children": [],
         "parentId": parent_id,
         "parentIdList": parent_id_list
@@ -599,6 +639,22 @@ def create_folder_tree(path, parent_id=None, parent_id_list=[]):
 def generate_folder_structure(root_path):
     result = create_folder_tree(root_path)
     folder_dict = result["folder_dict"]
+    
+    # 현재 날짜와 시간으로 파일 이름 생성
+    now = datetime.now()
+    file_name = now.strftime("%Y%m%d_%H%M%S") + "_folder_structure.json"
+    
+    # folder_tree 디렉토리 생성 (없는 경우)
+    folder_tree_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folder_tree")
+    os.makedirs(folder_tree_path, exist_ok=True)
+    
+    # JSON 파일로 저장
+    file_path = os.path.join(folder_tree_path, file_name)
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(folder_dict, f, ensure_ascii=False, indent=2)
+    
+    print(f"폴더 구조가 {file_path}에 저장되었습니다.")
+    
     return folder_dict
 
 import json
@@ -606,65 +662,6 @@ import uuid
 import requests
 from google.cloud import storage
 
-# def update_public_json_file(session, nano_id, uploaded_folder_structure):
-#     user = session.query(User).filter(User.nano_id == nano_id).first()
-#     team = session.query(Team).filter(Team.nano_id == nano_id).first()
-    
-#     if user:
-#         file_path = user.json_file
-
-#         if not user.json_file:
-#             raise KeyError("User Private folder not found or no json file associated.")
-#     elif team:
-#         team_id = team.id
-#         public_folder = session.query(PublicFolder).filter(PublicFolder.team_id == team_id).first()
-    
-#         if not public_folder or not public_folder.json_file:
-#             raise KeyError("Public folder not found or no json file associated.")
-#         file_path = public_folder.json_file
-    
-#     google_url = f"https://storage.googleapis.com/wcidfu-bucket/_media/{file_path}"
-
-#     # 기존 JSON 파일 가져오기
-#     response = requests.get(google_url)
-#     response.raise_for_status()  # 요청 실패 시 예외 발생
-
-#     # JSON 파일 내용 디코딩 및 로드
-#     public_folder_tree_file = response.content
-#     tree_file = json.loads(public_folder_tree_file.decode('utf-8'))
-
-#     # 현재 트리 구조에 새로운 폴더 구조 업데이트
-#     current_tree = tree_file.get('json', {})
-#     current_tree.update(uploaded_folder_structure)
-
-#     # Google Cloud Storage 클라이언트 생성
-#     storage_client = storage.Client()
-    
-#     bucket_name = "wcidfu-bucket"
-#     bucket = storage_client.bucket(bucket_name)
-#     blob = bucket.blob(f"_media/{file_path}")
-
-#     # 기존 파일 백업
-#     backup_blob = bucket.blob(f"_media/backup/{file_path}")
-#     bucket.copy_blob(blob, bucket, new_name=backup_blob.name) 
-
-#     # 기존 파일 삭제
-#     blob.delete()
-
-#     # 새로운 JSON 파일 경로 설정 및 업로드
-#     new_file_name = f"public_json_file/{uuid.uuid4()}.json"
-#     new_blob = bucket.blob(f"_media/{new_file_name}")
-    
-#     # 최종적으로 업데이트된 JSON 데이터를 생성하여 업로드
-#     updated_json_string = json.dumps(tree_file, ensure_ascii=False, indent=2)
-#     new_blob.upload_from_string(updated_json_string, content_type='application/json')
-
-#     # 데이터베이스 업데이트 및 세션 커밋
-#     public_folder.json_file = new_file_name
-#     session.commit()
-
-#     # 모든 작업이 성공하면 백업 파일 삭제
-#     backup_blob.delete()
 def update_public_json_file(session, nano_id, uploaded_folder_structure):
     user = session.query(User).filter(User.nano_id == nano_id).first()
     team = session.query(Team).filter(Team.nano_id == nano_id).first()
@@ -674,6 +671,7 @@ def update_public_json_file(session, nano_id, uploaded_folder_structure):
         if not user.json_file:
             raise KeyError("User Private folder not found or no json file associated.")
         entity = user
+        new_file_name = f"user_json_file/{generate(size=21)}.json"
     elif team:
         team_id = team.id
         public_folder = session.query(PublicFolder).filter(PublicFolder.team_id == team_id).first()
@@ -682,6 +680,7 @@ def update_public_json_file(session, nano_id, uploaded_folder_structure):
             raise KeyError("Public folder not found or no json file associated.")
         file_path = public_folder.json_file
         entity = public_folder
+        new_file_name = f"public_json_file/{generate(size=21)}.json"
     else:
         raise KeyError("Neither user nor team found with the given nano_id.")
     
@@ -714,7 +713,6 @@ def update_public_json_file(session, nano_id, uploaded_folder_structure):
     blob.delete()
 
     # 새로운 JSON 파일 경로 설정 및 업로드
-    new_file_name = f"public_json_file/{uuid.uuid4()}.json"
     new_blob = bucket.blob(f"_media/{new_file_name}")
     
     # 최종적으로 업데이트된 JSON 데이터를 생성하여 업로드
