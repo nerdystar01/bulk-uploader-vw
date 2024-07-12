@@ -701,8 +701,12 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
         total_folders -= 1
 
         uploade_folder_structure = {}
-        folder_path = os.path.join(root_path, folder_info["name"])
-        print(f"Checking path: {folder_path}") 
+        
+        if folder_info['parentId'] is None:
+            folder_path = root_path
+        else:
+            folder_path = os.path.join(root_path, folder_info["name"])
+        
         if not os.path.exists(folder_path):
             folder_progress.write(f"Skipping {folder_info['name']}: folder does not exist.")
             continue
