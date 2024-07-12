@@ -745,70 +745,28 @@ import uuid
 import requests
 from google.cloud import storage
 
-def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
-    for folder_id, folder_info in folder_structure.items():
-        uploade_folder_structure = {}
-        folder_path = os.path.join(root_path, folder_info["name"])
-        
-        if folder_info['parentId'] is None:
-            folder_path = root_path
-        else:
-            folder_path = os.path.join(root_path, folder_info["name"])
-
-        if not os.path.exists(folder_path):
-            continue
-        
-        png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
-        if not png_files:
-            update_public_json_file(session, nano_id, uploade_folder_structure)
-            continue
-
-        with ThreadPoolExecutor(max_workers=7) as executor:
-            futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
-
-            for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {folder_info['name']}"):
-                png = futures[future]
-                try:
-                    future.result()
-                except Exception as e:
-                    print(f"Error processing {png} in folder {folder_info['name']}: {e}")
-
-        uploade_folder_structure[folder_id] = folder_info
-        update_public_json_file(session, nano_id, uploade_folder_structure)
-        
-        
-    # return folder_structure
-
 # def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
-#     total_folders = len(folder_structure)
-#     folder_progress = tqdm(folder_structure.items(), total=total_folders, desc="Total folder processing")
-
-#     for folder_id, folder_info in folder_progress:
-#         folder_progress.set_description(f"Processing {folder_info['name']} (Remaining: {total_folders})")
-#         total_folders -= 1
-
+#     for folder_id, folder_info in folder_structure.items():
 #         uploade_folder_structure = {}
+#         folder_path = os.path.join(root_path, folder_info["name"])
         
 #         if folder_info['parentId'] is None:
 #             folder_path = root_path
 #         else:
 #             folder_path = os.path.join(root_path, folder_info["name"])
-        
+
 #         if not os.path.exists(folder_path):
-#             folder_progress.write(f"Skipping {folder_info['name']}: folder does not exist.")
 #             continue
         
 #         png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
-        
 #         if not png_files:
 #             update_public_json_file(session, nano_id, uploade_folder_structure)
-#             folder_progress.write(f"No PNG files in {folder_info['name']}, updating JSON.")
 #             continue
 
 #         with ThreadPoolExecutor(max_workers=7) as executor:
 #             futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
-            
-#             for future in tqdm(as_completed(futures), total=len(futures), desc=f"Uploading images in {folder_info['name']}"):
+
+#             for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {folder_info['name']}"):
 #                 png = futures[future]
 #                 try:
 #                     future.result()
@@ -817,7 +775,49 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
 
 #         uploade_folder_structure[folder_id] = folder_info
 #         update_public_json_file(session, nano_id, uploade_folder_structure)
-#         folder_progress.write(f"Completed processing {folder_info['name']}.")
+        
+        
+    # return folder_structure
+
+def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
+    total_folders = len(folder_structure)
+    folder_progress = tqdm(folder_structure.items(), total=total_folders, desc="Total folder processing")
+
+    for folder_id, folder_info in folder_progress:
+        folder_progress.set_description(f"Processing {folder_info['name']} (Remaining: {total_folders})")
+        total_folders -= 1
+
+        uploade_folder_structure = {}
+        
+        if folder_info['parentId'] is None:
+            folder_path = root_path
+        else:
+            folder_path = os.path.join(root_path, folder_info["name"])
+        
+        if not os.path.exists(folder_path):
+            folder_progress.write(f"Skipping {folder_info['name']}: folder does not exist.")
+            continue
+        
+        png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
+        
+        if not png_files:
+            update_public_json_file(session, nano_id, uploade_folder_structure)
+            folder_progress.write(f"No PNG files in {folder_info['name']}, updating JSON.")
+            continue
+
+        with ThreadPoolExecutor(max_workers=7) as executor:
+            futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
+            
+            for future in tqdm(as_completed(futures), total=len(futures), desc=f"Uploading images in {folder_info['name']}"):
+                png = futures[future]
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"Error processing {png} in folder {folder_info['name']}: {e}")
+
+        uploade_folder_structure[folder_id] = folder_info
+        update_public_json_file(session, nano_id, uploade_folder_structure)
+        folder_progress.write(f"Completed processing {folder_info['name']}.")
 
 def main(upload_folder, user_id, nano_id):
     print_timestamp('[main.py 작동 시작]')
