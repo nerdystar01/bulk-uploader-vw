@@ -667,7 +667,12 @@ from google.cloud import storage
 def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
     for folder_id, folder_info in folder_structure.items():
         uploade_folder_structure = {}
-        folder_path = os.path.join(root_path, folder_info["name"])
+        
+        if folder_info['parentId'] is None:
+            folder_path = root_path
+        else:
+            folder_path = os.path.join(root_path, folder_info["name"])
+        
         if not os.path.exists(folder_path):
             continue
         
