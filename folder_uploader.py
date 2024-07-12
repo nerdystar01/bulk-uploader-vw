@@ -559,7 +559,7 @@ def create_folder_tree(path, parent_id=None, parent_id_list=[]):
     # 하위 폴더들을 처리
     items = os.listdir(path)
 
-    with tqdm(total=len(items), desc=f"Processing {folder_name}") as pbar:
+    with tqdm(total=len(items), desc=f"Processing folder structure {folder_name}") as pbar:
         for item in items:
             item_path = os.path.join(path, item)
             if os.path.isdir(item_path):
@@ -669,7 +669,11 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
         uploade_folder_structure = {}
         folder_path = os.path.join(root_path, folder_info["name"])
         
-        
+        if folder_info['parentId'] is None:
+            folder_path = root_path
+        else:
+            folder_path = os.path.join(root_path, folder_info["name"])
+
         if not os.path.exists(folder_path):
             continue
         
