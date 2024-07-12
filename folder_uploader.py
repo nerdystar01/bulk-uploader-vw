@@ -734,6 +734,8 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
         
         png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
         
+        update_public_json_file(session, nano_id, uploade_folder_structure)
+
         if not png_files:
             folder_progress.write(f"No PNG files in {folder_info['name']}, updating JSON.")
             continue
