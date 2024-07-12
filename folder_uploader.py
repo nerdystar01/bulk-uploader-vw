@@ -578,7 +578,7 @@ def generate_folder_id():
 #     }
 
 def create_folder_tree(path, parent_id=None, parent_id_list=[]):
-    folder_name = os.path.basename(path)
+    folder_name = os.path.abspath(path)
     folder_id = generate_folder_id()
 
     folder_info = {
@@ -717,23 +717,24 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
         folder_progress.set_description(f"Processing {folder_info['name']} (Remaining: {total_folders})")
         total_folders -= 1
 
-        uploade_folder_structure = {}
-        uploade_folder_structure[folder_id] = folder_info
         
-        if folder_info['parentId'] is None:
-            folder_path = root_path
-        else:
-            folder_path = os.path.join(root_path, folder_info["name"])
-        
+        folder_path = folder_info['name']
 
         if not os.path.exists(folder_path):
             folder_progress.write(f"Skipping {folder_info['name']}: folder does not exist.")
             continue
         
+        # 폴더 정보에서 이름만 추출
+        folder_name = os.path.basename(folder_path)
+
+        uploade_folder_structure = {}
+        updated_folder_info = folder_info.copy()
+        updated_folder_info['name'] = folder_name
+        uploade_folder_structure[folder_id] = updated_folder_info
+        
         png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
         
         if not png_files:
-            update_public_json_file(session, nano_id, uploade_folder_structure)
             folder_progress.write(f"No PNG files in {folder_info['name']}, updating JSON.")
             continue
 
@@ -747,7 +748,6 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
                 except Exception as e:
                     print(f"Error processing {png} in folder {folder_info['name']}: {e}")
 
-        update_public_json_file(session, nano_id, uploade_folder_structure)
         folder_progress.write(f"Completed processing {folder_info['name']}.")
 
 def main(upload_folder, user_id, nano_id):
