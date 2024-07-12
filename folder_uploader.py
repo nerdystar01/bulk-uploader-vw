@@ -671,6 +671,7 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
         
         png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
         if not png_files:
+            update_public_json_file(session, nano_id, uploade_folder_structure)
             continue
 
         with ThreadPoolExecutor(max_workers=7) as executor:
@@ -684,10 +685,8 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
                     print(f"Error processing {png} in folder {folder_info['name']}: {e}")
 
         uploade_folder_structure[folder_id] = folder_info
-        print(uploade_folder_structure)
-        print("퍼블릭 폴더 업데이트 시작.")
         update_public_json_file(session, nano_id, uploade_folder_structure)
-        print("퍼블릭 폴더 업데이트 종료.")
+        
         
     return folder_structure
     
