@@ -557,13 +557,17 @@ def create_folder_tree(path, parent_id=None, parent_id_list=[]):
     folder_dict = {folder_id: folder_info}
     
     # 하위 폴더들을 처리
-    for item in os.listdir(path):
-        item_path = os.path.join(path, item)
-        if os.path.isdir(item_path):
-            child_folder_result = create_folder_tree(item_path, folder_id, parent_id_list_updated)
-            child_folder_info = child_folder_result["folder_info"]
-            folder_info["children"].append(child_folder_info["id"])
-            folder_dict.update(child_folder_result["folder_dict"])
+    items = os.listdir(path)
+
+    with tqdm(total=len(items), desc=f"Processing {folder_name}") as pbar:
+        for item in items:
+            item_path = os.path.join(path, item)
+            if os.path.isdir(item_path):
+                child_folder_result = create_folder_tree(item_path, folder_id, parent_id_list_updated)
+                child_folder_info = child_folder_result["folder_info"]
+                folder_info["children"].append(child_folder_info["id"])
+                folder_dict.update(child_folder_result["folder_dict"])
+            pbar.update(1)
 
     return {
         "folder_info": folder_info,
@@ -571,7 +575,6 @@ def create_folder_tree(path, parent_id=None, parent_id_list=[]):
     }
 
 def update_public_json_file(session, nano_id, uploaded_folder_structure):
-    print("잔압")
     user = session.query(User).filter(User.nano_id == nano_id).first()
     team = session.query(Team).filter(Team.nano_id == nano_id).first()
     
@@ -634,7 +637,6 @@ def update_public_json_file(session, nano_id, uploaded_folder_structure):
 
     # 모든 작업이 성공하면 백업 파일 삭제
     backup_blob.delete()
-    print("탈출")
 
 def generate_folder_structure(root_path):
     result = create_folder_tree(root_path)
@@ -662,22 +664,60 @@ import uuid
 import requests
 from google.cloud import storage
 
+# def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
+#     for folder_id, folder_info in folder_structure.items():
+#         uploade_folder_structure = {}
+#         folder_path = os.path.join(root_path, folder_info["name"])
+#         if not os.path.exists(folder_path):
+#             continue
+        
+#         png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
+#         if not png_files:
+#             update_public_json_file(session, nano_id, uploade_folder_structure)
+#             continue
+
+#         with ThreadPoolExecutor(max_workers=7) as executor:
+#             futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
+
+#             for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {folder_info['name']}"):
+#                 png = futures[future]
+#                 try:
+#                     future.result()
+#                 except Exception as e:
+#                     print(f"Error processing {png} in folder {folder_info['name']}: {e}")
+
+#         uploade_folder_structure[folder_id] = folder_info
+#         update_public_json_file(session, nano_id, uploade_folder_structure)
+        
+        
+    # return folder_structure
+
 def process_folder_with_structure(folder_structure, root_path, user_id, nano_id, session):
-    for folder_id, folder_info in folder_structure.items():
+    total_folders = len(folder_structure)
+    folder_progress = tqdm(folder_structure.items(), total=total_folders, desc="Total folder processing")
+
+    for folder_id, folder_info in folder_progress:
+        folder_progress.set_description(f"Processing {folder_info['name']} (Remaining: {total_folders})")
+        total_folders -= 1
+
         uploade_folder_structure = {}
         folder_path = os.path.join(root_path, folder_info["name"])
+        
         if not os.path.exists(folder_path):
+            folder_progress.write(f"Skipping {folder_info['name']}: folder does not exist.")
             continue
         
         png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
+        
         if not png_files:
             update_public_json_file(session, nano_id, uploade_folder_structure)
+            folder_progress.write(f"No PNG files in {folder_info['name']}, updating JSON.")
             continue
 
         with ThreadPoolExecutor(max_workers=7) as executor:
             futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
-
-            for future in tqdm(as_completed(futures), total=len(futures), desc=f"Processing images in {folder_info['name']}"):
+            
+            for future in tqdm(as_completed(futures), total=len(futures), desc=f"Uploading images in {folder_info['name']}"):
                 png = futures[future]
                 try:
                     future.result()
@@ -686,10 +726,8 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
 
         uploade_folder_structure[folder_id] = folder_info
         update_public_json_file(session, nano_id, uploade_folder_structure)
-        
-        
-    return folder_structure
-    
+        folder_progress.write(f"Completed processing {folder_info['name']}.")
+
 def main(upload_folder, user_id, nano_id):
     print_timestamp('[main.py 작동 시작]')
     session, server = get_session()
