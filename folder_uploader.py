@@ -788,12 +788,14 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
         total_folders -= 1
 
         uploade_folder_structure = {}
+        uploade_folder_structure[folder_id] = folder_info
         
         if folder_info['parentId'] is None:
             folder_path = root_path
         else:
             folder_path = os.path.join(root_path, folder_info["name"])
         
+
         if not os.path.exists(folder_path):
             folder_progress.write(f"Skipping {folder_info['name']}: folder does not exist.")
             continue
@@ -815,7 +817,6 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
                 except Exception as e:
                     print(f"Error processing {png} in folder {folder_info['name']}: {e}")
 
-        uploade_folder_structure[folder_id] = folder_info
         update_public_json_file(session, nano_id, uploade_folder_structure)
         folder_progress.write(f"Completed processing {folder_info['name']}.")
 
