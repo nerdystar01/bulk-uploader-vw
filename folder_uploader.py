@@ -223,8 +223,8 @@ class Resource(Base):
     tags = Column(String(200), default="")
     generate_opt = Column(String(200), default="Upload")
     count_download = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class PublicFolder(Base):
     __tablename__ = 'public_folder'
