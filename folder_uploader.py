@@ -222,6 +222,7 @@ class Resource(Base):
     clip_skip = Column(Integer, default=0)
     tags = Column(String(200), default="")
     generate_opt = Column(String(200), default="Upload")
+    count_download = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
@@ -538,44 +539,6 @@ def process_folder(upload_folder, user_id, team_id, session):
              
 def generate_folder_id():
     return generate(size=21)
-
-# def create_folder_tree(path, parent_id=None, parent_id_list=[]):
-#     # folder_name = os.path.abspath(path)  # 절대 경로를 폴더 이름으로 설정
-#     folder_name = os.path.basename(path)
-#     folder_id = generate_folder_id()
-
-#     # 현재 폴더 정보를 설정
-#     folder_info = {
-#         "id": folder_id,
-#         "name": folder_name,
-#         "children": [],
-#         "parentId": parent_id,
-#         "parentIdList": parent_id_list
-#     }
-
-#     # 부모 ID 리스트를 갱신
-#     parent_id_list_updated = parent_id_list + [folder_id] if parent_id else [folder_id]
-
-#     # 폴더 딕셔너리 생성
-#     folder_dict = {folder_id: folder_info}
-    
-#     # 하위 폴더들을 처리
-#     items = os.listdir(path)
-
-#     with tqdm(total=len(items), desc=f"Processing folder structure {folder_name}") as pbar:
-#         for item in items:
-#             item_path = os.path.join(path, item)
-#             if os.path.isdir(item_path):
-#                 child_folder_result = create_folder_tree(item_path, folder_id, parent_id_list_updated)
-#                 child_folder_info = child_folder_result["folder_info"]
-#                 folder_info["children"].append(child_folder_info["id"])
-#                 folder_dict.update(child_folder_result["folder_dict"])
-#             pbar.update(1)
-
-#     return {
-#         "folder_info": folder_info,
-#         "folder_dict": folder_dict
-#     }
 
 def create_folder_tree(path, parent_id=None, parent_id_list=[]):
     folder_name = os.path.abspath(path)
