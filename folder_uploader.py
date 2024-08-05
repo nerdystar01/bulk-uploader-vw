@@ -5,6 +5,7 @@ import json
 import zlib
 import io
 import struct
+import time
 import re
 import uuid
 import requests
@@ -21,8 +22,8 @@ import piexif
 import piexif.helper
 
 # 데이터베이스 및 ORM
-from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Text, LargeBinary
-from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, ForeignKey, DateTime, Text, Table
+from sqlalchemy.orm import scoped_session, sessionmaker, relationship
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.postgresql import UUID, ENUM
 
@@ -36,6 +37,9 @@ from urllib.parse import quote_plus
 
 # 동시성 및 멀티스레딩
 import threading
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def install_requirements():
     subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
@@ -68,6 +72,23 @@ engine = None
 session_factory = None
 server = None
 lock = threading.Lock()
+
+MAX_RETRIES = 5
+RETRY_DELAY = 5
+
+def retry_on_exception(func):
+    def wrapper(*args, **kwargs):
+        for attempt in range(MAX_RETRIES):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                logging.error(f"Error in {func.__name__}: {str(e)}")
+                if attempt < MAX_RETRIES - 1:
+                    logging.info(f"Retrying in {RETRY_DELAY} seconds...")
+                    time.sleep(RETRY_DELAY)
+                else:
+                    raise
+    return wrapper
 
 class PNGInfoAPI:
     def read_info_from_image(self, image: Image.Image):
@@ -165,6 +186,11 @@ Steps: {json_info["steps"]}, CFG scale: {json_info["scale"]}, Seed: {json_info["
         except Exception as e:
             print("Error:", str(e))
 
+resource_likes = Table('resource_likes', Base.metadata,
+    Column('resource_id', Integer, ForeignKey('resource.id')),
+    Column('user_id', Integer, ForeignKey('user.id'))
+)
+
 class User(Base):
     __tablename__ = 'user'
     id = Column(Integer, primary_key=True)
@@ -172,6 +198,7 @@ class User(Base):
     folder_id = Column(Integer, nullable=True)
     json_file = Column(String, nullable=True)  # SQLAlchemy does not support a direct FileField equivalent
     nano_id = Column(String(21), unique=True, nullable=True)
+    liked_resources = relationship("Resource", secondary=resource_likes, back_populates="likes")
 
 class Resource(Base):
     __tablename__ = 'resource'
@@ -225,6 +252,8 @@ class Resource(Base):
     count_download = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    likes = relationship("User", secondary=resource_likes, back_populates="liked_resources")
+
 
 class PublicFolder(Base):
     __tablename__ = 'public_folder'
@@ -266,6 +295,7 @@ class Team(Base):
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
+@retry_on_exception
 def start_ssh_tunnel():
     server = SSHTunnelForwarder(
         ('34.64.105.81', 22),
@@ -277,6 +307,7 @@ def start_ssh_tunnel():
     print("SSH tunnel established")
     return server
 
+@retry_on_exception
 def setup_database_engine(password, port):
     db_user = "wcidfu"
     db_host = "127.0.0.1"
@@ -286,21 +317,23 @@ def setup_database_engine(password, port):
     Base.metadata.create_all(engine)
     return engine
 
+@retry_on_exception
 def get_session():
     global engine, session_factory, server, lock
     with lock:
-        if server is None:
+        if server is None or not server.is_active:
             server = start_ssh_tunnel()
         if engine is None:
             engine = setup_database_engine("nerdy@2024", server.local_bind_port)
         if session_factory is None:
             session_factory = sessionmaker(bind=engine)
-    session = scoped_session(session_factory)  # 수정된 부분: 세션 팩토리에서 직접 scoped_session 인스턴스 생성
+    session = scoped_session(session_factory)
     return session, server
 
 def end_session(session):
     session.close()
 
+@retry_on_exception
 def upload_to_bucket(blob_name, data, bucket_name):
     current_script_path = os.path.abspath(__file__)
     base_directory = os.path.dirname(current_script_path)
@@ -320,6 +353,7 @@ def upload_to_bucket(blob_name, data, bucket_name):
 def print_timestamp(message):
     print(f"{message}: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
+@retry_on_exception
 def create_resource(user_id, original_image, image_128, image_518, session):
     pnginfo = PngImagePlugin.PngInfo()
     png_info_api_instance = PNGInfoAPI()
@@ -505,6 +539,7 @@ def process_images(image_path, heights=(128, 512)):
     resized_images = {height: resize_image(original_image, height) for height in heights}
     return original_image, resized_images[128], resized_images[512]
 
+@retry_on_exception
 def mapping_folder_resource(session, resource_id, folder_json_id, team_id):
     new_mapping = FolderResourceMap(
             folder_json_id = folder_json_id,
@@ -514,6 +549,7 @@ def mapping_folder_resource(session, resource_id, folder_json_id, team_id):
     session.add(new_mapping)
     session.commit()
 
+@retry_on_exception
 def process_and_upload(png, upload_folder, user_id, folder_json_id, team_id, session):
     png_path = os.path.join(upload_folder, png)
     original_image, image_128, image_518 = process_images(png_path)  # 이미지 크기 조정 및 저장
@@ -573,6 +609,7 @@ def create_folder_tree(path, parent_id=None, parent_id_list=[]):
         "folder_dict": folder_dict
     }
 
+@retry_on_exception
 def update_public_json_file(session, nano_id, uploaded_folder_structure):
     user = session.query(User).filter(User.nano_id == nano_id).first()
     team = session.query(Team).filter(Team.nano_id == nano_id).first()
@@ -697,7 +734,11 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
         
         png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
         
-        update_public_json_file(session, nano_id, uploade_folder_structure)
+        try:
+            update_public_json_file(session, nano_id, uploade_folder_structure)
+        except Exception as e:
+            logging.error(f"Error updating public JSON file: {str(e)}")
+            continue
 
         if not png_files:
             folder_progress.write(f"No PNG files in {folder_info['name']}, updating JSON.")
