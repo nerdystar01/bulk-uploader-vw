@@ -76,10 +76,43 @@ lock = threading.Lock()
 MAX_RETRIES = 5
 RETRY_DELAY = 5
 
+class SSHConnection:
+    def __init__(self):
+        self.server = None
+
+    def start_ssh_tunnel(self):
+        try:
+            self.server = SSHTunnelForwarder(
+                ('34.64.105.81', 22),
+                ssh_username='nerdystar',
+                ssh_pkey='./wcidfu-ssh',
+                remote_bind_address=('10.1.31.44', 5432),
+                set_keepalive=60
+            )
+            self.server.start()
+            logging.info("SSH tunnel established")
+            return self.server
+        except Exception as e:
+            logging.error(f"Error establishing SSH tunnel: {str(e)}")
+            raise
+
+    def check_connection(self):
+        if self.server is None or not self.server.is_active:
+            logging.info("SSH connection is not active. Reconnecting...")
+            self.start_ssh_tunnel()
+
+    def stop_ssh_tunnel(self):
+        if self.server:
+            self.server.stop()
+            logging.info("SSH tunnel closed")
+
+ssh_connection = SSHConnection()
+
 def retry_on_exception(func):
     def wrapper(*args, **kwargs):
         for attempt in range(MAX_RETRIES):
             try:
+                ssh_connection.check_connection()
                 return func(*args, **kwargs)
             except Exception as e:
                 logging.error(f"Error in {func.__name__}: {str(e)}")
@@ -319,19 +352,15 @@ def setup_database_engine(password, port):
 
 @retry_on_exception
 def get_session():
-    global engine, session_factory, server, lock
-    with lock:
-        if server is None or not server.is_active:
-            server = start_ssh_tunnel()
-        if engine is None:
-            engine = setup_database_engine("nerdy@2024", server.local_bind_port)
-        if session_factory is None:
-            session_factory = sessionmaker(bind=engine)
+    server = ssh_connection.start_ssh_tunnel()
+    engine = setup_database_engine("nerdy@2024", server.local_bind_port)
+    session_factory = sessionmaker(bind=engine)
     session = scoped_session(session_factory)
     return session, server
 
 def end_session(session):
     session.close()
+    ssh_connection.stop_ssh_tunnel()
 
 @retry_on_exception
 def upload_to_bucket(blob_name, data, bucket_name):
