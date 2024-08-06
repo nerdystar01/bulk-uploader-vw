@@ -568,6 +568,13 @@ def process_images(image_path, heights=(128, 512)):
     resized_images = {height: resize_image(original_image, height) for height in heights}
     return original_image, resized_images[128], resized_images[512]
 
+folder_resource_mapping = {}
+
+def update_folder_resource_mapping(folder_id, resource_id):
+    if folder_id not in folder_resource_mapping:
+        folder_resource_mapping[folder_id] = []
+    folder_resource_mapping[folder_id].append(resource_id)
+
 @retry_on_exception
 def mapping_folder_resource(session, resource_id, folder_json_id, team_id):
     new_mapping = FolderResourceMap(
@@ -584,6 +591,7 @@ def process_and_upload(png, upload_folder, user_id, folder_json_id, team_id, ses
     original_image, image_128, image_518 = process_images(png_path)  # 이미지 크기 조정 및 저장
     resource_id = create_resource(user_id, original_image, image_128, image_518, session)
     mapping_folder_resource(session, resource_id, folder_json_id, team_id)
+    update_folder_resource_mapping(folder_json_id, resource_id)
 
 def process_folder(upload_folder, user_id, team_id, session):
     for root, dirs, files in os.walk(upload_folder):
@@ -784,6 +792,18 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
                     print(f"Error processing {png} in folder {folder_info['name']}: {e}")
 
         folder_progress.write(f"Completed processing {folder_info['name']}.")
+    
+    save_folder_resource_mapping(nano_id)
+
+def save_folder_resource_mapping(nano_id):
+    mapping_folder = "folder_resource_mapping"
+    os.makedirs(mapping_folder, exist_ok=True)
+    mapping_file = os.path.join(mapping_folder, f"{nano_id}_mapping.json")
+    
+    with open(mapping_file, 'w') as f:
+        json.dump(folder_resource_mapping, f, indent=2)
+    
+    print(f"Folder resource mapping saved to {mapping_file}")
 
 def main(upload_folder, user_id, nano_id):
     print_timestamp('[main.py 작동 시작]')
