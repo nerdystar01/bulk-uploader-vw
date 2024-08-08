@@ -223,7 +223,10 @@ resource_likes = Table('resource_likes', Base.metadata,
     Column('resource_id', Integer, ForeignKey('resource.id')),
     Column('user_id', Integer, ForeignKey('user.id'))
 )
-
+resource_tags = Table('resource_tags', Base.metadata,
+    Column('resource_id', Integer, ForeignKey('resource.id')),
+    Column('colorcodetagss_id', Integer, ForeignKey('color_code_tags.id'))
+)
 class User(Base):
     __tablename__ = 'user'
     id = Column(Integer, primary_key=True)
@@ -280,13 +283,24 @@ class Resource(Base):
     is_variation = Column(Boolean, default=False)
     star_rating = Column(Integer, default=0)
     clip_skip = Column(Integer, default=0)
-    tags = Column(String(200), default="")
+    tags = relationship("ColorCodeTags", secondary=resource_tags, back_populates="resources")
     generate_opt = Column(String(200), default="Upload")
     count_download = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     likes = relationship("User", secondary=resource_likes, back_populates="liked_resources")
 
+class ColorCodeTags(Base):
+    __tablename__ = 'color_code_tags'
+    
+    id = Column(Integer, primary_key=True)
+    color_code = Column(String(7))
+    tag = Column(String(4000))
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Resource와의 역참조 관계
+    resources = relationship("Resource", secondary=resource_tags, back_populates="tags")
 
 class PublicFolder(Base):
     __tablename__ = 'public_folder'
