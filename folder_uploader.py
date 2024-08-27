@@ -795,7 +795,7 @@ def process_folder_with_structure(folder_structure, root_path, user_id, nano_id,
             folder_progress.write(f"No PNG files in {folder_info['name']}, updating JSON.")
             continue
 
-        with ThreadPoolExecutor(max_workers=7) as executor:
+        with ThreadPoolExecutor(max_workers=5) as executor:
             futures = {executor.submit(process_and_upload, png, folder_path, user_id, folder_id, nano_id, session): png for png in png_files}
             
             for future in tqdm(as_completed(futures), total=len(futures), desc=f"Uploading images in {folder_info['name']}"):
