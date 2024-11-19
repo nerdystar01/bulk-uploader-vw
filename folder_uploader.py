@@ -227,6 +227,19 @@ resource_tags = Table('resource_tags', Base.metadata,
     Column('resource_id', Integer, ForeignKey('resource.id')),
     Column('colorcodetagss_id', Integer, ForeignKey('color_code_tags.id'))
 )
+resource_hidden_users = Table(
+    'resource_hidden_users',
+    Base.metadata,
+    Column('resource_id', Integer, ForeignKey('resource.id')),
+    Column('user_id', Integer, ForeignKey('user.id')),
+)
+
+resource_tabbed_users = Table(
+    'resource_tabbed_users',
+    Base.metadata,
+    Column('resource_id', Integer, ForeignKey('resource.id')),
+    Column('user_id', Integer, ForeignKey('user.id')),
+)
 class User(Base):
     __tablename__ = 'user'
     id = Column(Integer, primary_key=True)
@@ -289,6 +302,23 @@ class Resource(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     likes = relationship("User", secondary=resource_likes, back_populates="liked_resources")
+    reference_resource_id = Column(Integer, nullable=True)
+    royalty = Column(Float, default=0.0)
+    hidden_by = relationship(
+        "User",
+        secondary="resource_hidden_users",
+        back_populates="hidden_resources"
+    )
+    
+    tabbed_by = relationship(
+        "User",
+        secondary="resource_tabbed_users",
+        back_populates="tabbed_resources"
+    )
+    
+    # GPT Vision 점수
+    gpt_vision_score = Column(Integer, nullable=True)
+
 
 class ColorCodeTags(Base):
     __tablename__ = 'color_code_tags'
