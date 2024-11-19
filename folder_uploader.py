@@ -248,6 +248,17 @@ class User(Base):
     json_file = Column(String, nullable=True)  # SQLAlchemy does not support a direct FileField equivalent
     nano_id = Column(String(21), unique=True, nullable=True)
     liked_resources = relationship("Resource", secondary=resource_likes, back_populates="likes")
+    hidden_resources = relationship(
+        "Resource",
+        secondary="resource_hidden_users",
+        back_populates="hidden_by"
+    )
+    
+    tabbed_resources = relationship(
+        "Resource",
+        secondary="resource_tabbed_users",
+        back_populates="tabbed_by"
+    )
 
 class Resource(Base):
     __tablename__ = 'resource'
